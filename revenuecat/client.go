@@ -21,7 +21,7 @@ const (
 	MaxResponseBytes = 1 << 20
 
 	defaultBaseURL = "https://api.revenuecat.com"
-	userAgent      = "mcp-server-revenuecat-org"
+	userAgent      = "mcp-server-revenuecat"
 )
 
 // ErrReadOnly is returned when Post or Delete is called with a context marked

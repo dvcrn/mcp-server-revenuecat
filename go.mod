@@ -1,4 +1,4 @@
-module github.com/dvcrn/mcp-server-revenuecat-org
+module github.com/dvcrn/mcp-server-revenuecat
 
 go 1.26.3
 

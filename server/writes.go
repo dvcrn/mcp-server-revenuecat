@@ -10,7 +10,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/dvcrn/mcp-server-revenuecat-org/revenuecat"
+	"github.com/dvcrn/mcp-server-revenuecat/revenuecat"
 )
 
 // minEpochMillis is 2001-09-09T01:46:40Z in Unix milliseconds, used to reject

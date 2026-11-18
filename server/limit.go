@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/dvcrn/mcp-server-revenuecat-org/revenuecat"
+	"github.com/dvcrn/mcp-server-revenuecat/revenuecat"
 )
 
 const (

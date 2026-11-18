@@ -7,12 +7,12 @@ const crypto = require("crypto");
 const { spawnSync } = require("child_process");
 
 const OWNER = "dvcrn";
-const REPO = "mcp-server-revenuecat-org";
-const BIN = "mcp-server-revenuecat-org";
-const VERSION_ENV = "MCP_SERVER_REVENUECAT_ORG_VERSION";
-const BASE_URL_ENV = "MCP_SERVER_REVENUECAT_ORG_BASE_URL";
-const ARCH_ENV = "MCP_SERVER_REVENUECAT_ORG_ARCH";
-const PLATFORM_ENV = "MCP_SERVER_REVENUECAT_ORG_PLATFORM";
+const REPO = "mcp-server-revenuecat";
+const BIN = "mcp-server-revenuecat";
+const VERSION_ENV = "MCP_SERVER_REVENUECAT_VERSION";
+const BASE_URL_ENV = "MCP_SERVER_REVENUECAT_BASE_URL";
+const ARCH_ENV = "MCP_SERVER_REVENUECAT_ARCH";
+const PLATFORM_ENV = "MCP_SERVER_REVENUECAT_PLATFORM";
 const REQUEST_TIMEOUT_MS = 15000;
 const MAX_REDIRECTS = 5;
 
@@ -99,7 +99,7 @@ async function installBinary({ outDir = __dirname, fetchBuffer = httpGet } = {})
   const platform = platformRaw === "win32" ? "windows" : platformRaw;
   if (!["darwin", "linux", "windows"].includes(platform)) {
     throw new Error(
-      "mcp-server-revenuecat-org: npm install supports macOS (darwin), Linux, and Windows only",
+      "mcp-server-revenuecat: npm install supports macOS (darwin), Linux, and Windows only",
     );
   }
 

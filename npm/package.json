@@ -1,10 +1,10 @@
 {
-  "name": "mcp-server-revenuecat-org",
+  "name": "mcp-server-revenuecat",
   "version": "0.0.0",
   "description": "Multi-project MCP server for RevenueCat REST API v2 with read-only mode controls",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dvcrn/mcp-server-revenuecat-org.git",
+    "url": "git+https://github.com/dvcrn/mcp-server-revenuecat.git",
     "directory": "npm"
   },
   "files": [
@@ -19,7 +19,7 @@
     "access": "public"
   },
   "bin": {
-    "mcp-server-revenuecat-org": "index.js"
+    "mcp-server-revenuecat": "index.js"
   },
   "dependencies": {
     "semver": "^7.7.4"

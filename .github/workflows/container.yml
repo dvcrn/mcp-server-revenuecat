@@ -46,7 +46,7 @@ jobs:
           build-args: GO_VERSION=${{ steps.go.outputs.version }}
           platforms: linux/arm64
           load: true
-          tags: mcp-server-revenuecat-org:test
+          tags: mcp-server-revenuecat:test
           cache-from: type=gha,scope=container
           cache-to: type=gha,mode=max,scope=container
 
@@ -55,7 +55,7 @@ jobs:
         run: |
           container=$(docker run --detach \
             --env MCP_TOKEN=container-smoke-test \
-            --publish 127.0.0.1::8080 mcp-server-revenuecat-org:test)
+            --publish 127.0.0.1::8080 mcp-server-revenuecat:test)
           trap 'docker logs "$container"; docker rm --force "$container" >/dev/null' EXIT
           address=$(docker port "$container" 8080/tcp)
           test "$(curl --fail --silent --show-error --retry 10 --retry-all-errors \

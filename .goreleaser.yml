@@ -1,11 +1,11 @@
 version: 2
 
-project_name: mcp-server-revenuecat-org
+project_name: mcp-server-revenuecat
 
 builds:
-  - id: mcp-server-revenuecat-org
+  - id: mcp-server-revenuecat
     main: ./cmd/mcp
-    binary: mcp-server-revenuecat-org
+    binary: mcp-server-revenuecat
     env:
       - CGO_ENABLED=0
     goos:
@@ -42,7 +42,7 @@ checksum:
 release:
   github:
     owner: dvcrn
-    name: mcp-server-revenuecat-org
+    name: mcp-server-revenuecat
   replace_existing_artifacts: true
 
 changelog:

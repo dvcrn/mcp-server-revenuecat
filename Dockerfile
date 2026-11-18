@@ -14,7 +14,7 @@ ARG TARGETOS
 ARG TARGETARCH
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w -buildid=" \
-    -o mcp-server-revenuecat-org ./cmd/mcp
+    -o mcp-server-revenuecat ./cmd/mcp
 
 FROM alpine:3.22
 
@@ -24,11 +24,11 @@ RUN apk --no-cache add ca-certificates && \
 
 WORKDIR /app
 
-COPY --from=builder /app/mcp-server-revenuecat-org .
+COPY --from=builder /app/mcp-server-revenuecat .
 
 USER appuser
 
 EXPOSE 8080
 
-ENTRYPOINT ["./mcp-server-revenuecat-org"]
+ENTRYPOINT ["./mcp-server-revenuecat"]
 CMD ["-http", ":8080"]

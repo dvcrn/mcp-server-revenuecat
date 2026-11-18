@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "mcp-server-revenuecat-org-worker",
+      "name": "mcp-server-revenuecat-worker",
       "devDependencies": {
         "wrangler": "4.156.1",
       },

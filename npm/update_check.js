@@ -3,17 +3,17 @@ const path = require("path");
 const os = require("os");
 const https = require("https");
 
-const DEFAULT_PACKAGE_NAME = "mcp-server-revenuecat-org";
-const DEFAULT_UPDATE_COMMAND = "npm install -g mcp-server-revenuecat-org";
-const CACHE_DIR_NAME = "mcp-server-revenuecat-org";
+const DEFAULT_PACKAGE_NAME = "mcp-server-revenuecat";
+const DEFAULT_UPDATE_COMMAND = "npm install -g mcp-server-revenuecat";
+const CACHE_DIR_NAME = "mcp-server-revenuecat";
 
 const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const UPDATE_CHECK_TIMEOUT_MS = 1200;
 
 function isDisabled() {
   return (
-    process.env.MCP_SERVER_REVENUECAT_ORG_NO_UPDATE_NOTICE === "1" ||
-    process.env.MCP_SERVER_REVENUECAT_ORG_NO_UPDATE_NOTICE === "true" ||
+    process.env.MCP_SERVER_REVENUECAT_NO_UPDATE_NOTICE === "1" ||
+    process.env.MCP_SERVER_REVENUECAT_NO_UPDATE_NOTICE === "true" ||
     process.env.NO_UPDATE_NOTIFIER === "1" ||
     process.env.NO_UPDATE_NOTIFIER === "true" ||
     process.env.CI === "1" ||

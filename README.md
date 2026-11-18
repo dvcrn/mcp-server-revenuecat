@@ -1,4 +1,4 @@
-# mcp-server-revenuecat-org
+# mcp-server-revenuecat
 
 Multi-project MCP server for RevenueCat REST API v2, written in Go.
 
@@ -7,7 +7,7 @@ This server addresses two limitations of connecting agents directly to RevenueCa
 - Interactive OAuth sessions on the hosted MCP expire, breaking unattended and background agents.
 - Each RevenueCat API v2 secret key (`sk_...`) is scoped to a single project, so multi-project setups otherwise need a separate MCP server per app or project.
 
-`mcp-server-revenuecat-org` serves all configured RevenueCat projects behind one MCP endpoint (stdio, HTTP, Docker, or Cloudflare Workers), routing each tool call to the right project's `sk_` secret key and supporting strict read-only mode via `MCP_READ_ONLY` or `MCP_READ_TOKEN`.
+`mcp-server-revenuecat` serves all configured RevenueCat projects behind one MCP endpoint (stdio, HTTP, Docker, or Cloudflare Workers), routing each tool call to the right project's `sk_` secret key and supporting strict read-only mode via `MCP_READ_ONLY` or `MCP_READ_TOKEN`.
 
 ## Setup
 
@@ -46,9 +46,9 @@ Pick one method and add its entry to `mcpServers` in your client configuration. 
 ### npx, without installing
 
 ```json
-"revenuecat-org": {
+"revenuecat": {
   "command": "npx",
-  "args": ["-y", "mcp-server-revenuecat-org"],
+  "args": ["-y", "mcp-server-revenuecat"],
   "env": {
     "MCP_READ_ONLY": "1",
     "REVENUECAT_PROJECTS": "[{\"alias\":\"ios_app\",\"name\":\"Dummy iOS App\",\"project_id\":\"proj1ab2c3d4\",\"api_key\":\"sk_dummy_projectA\"}]"
@@ -61,16 +61,16 @@ Pick one method and add its entry to `mcpServers` in your client configuration. 
 Install with one of:
 
 ```sh
-npm install -g mcp-server-revenuecat-org
-mise use -g go:github.com/dvcrn/mcp-server-revenuecat-org/cmd/mcp@latest
-go install github.com/dvcrn/mcp-server-revenuecat-org/cmd/mcp@latest
+npm install -g mcp-server-revenuecat
+mise use -g go:github.com/dvcrn/mcp-server-revenuecat/cmd/mcp@latest
+go install github.com/dvcrn/mcp-server-revenuecat/cmd/mcp@latest
 ```
 
-npm installs the binary as `mcp-server-revenuecat-org`. mise and `go install` name it `mcp` after the package directory, so use `mcp` as `command` for those:
+npm installs the binary as `mcp-server-revenuecat`. mise and `go install` name it `mcp` after the package directory, so use `mcp` as `command` for those:
 
 ```json
-"revenuecat-org": {
-  "command": "mcp-server-revenuecat-org",
+"revenuecat": {
+  "command": "mcp-server-revenuecat",
   "env": {
     "REVENUECAT_PROJECTS": "[{\"alias\":\"ios_app\",\"name\":\"Dummy iOS App\",\"project_id\":\"proj1ab2c3d4\",\"api_key\":\"sk_dummy_projectA\"}]"
   }
@@ -79,16 +79,16 @@ npm installs the binary as `mcp-server-revenuecat-org`. mise and `go install` na
 
 ### Docker
 
-The image at `ghcr.io/dvcrn/mcp-server-revenuecat-org` serves HTTP on `:8080` by default. For stdio, override the entrypoint:
+The image at `ghcr.io/dvcrn/mcp-server-revenuecat` serves HTTP on `:8080` by default. For stdio, override the entrypoint:
 
 ```json
-"revenuecat-org": {
+"revenuecat": {
   "command": "docker",
   "args": [
     "run", "-i", "--rm",
-    "--entrypoint", "/app/mcp-server-revenuecat-org",
+    "--entrypoint", "/app/mcp-server-revenuecat",
     "-e", "REVENUECAT_PROJECTS", "-e", "MCP_READ_ONLY",
-    "ghcr.io/dvcrn/mcp-server-revenuecat-org:latest"
+    "ghcr.io/dvcrn/mcp-server-revenuecat:latest"
   ],
   "env": {
     "MCP_READ_ONLY": "1",
@@ -102,7 +102,7 @@ To serve HTTP at `http://localhost:8080/mcp` (with unauthenticated health checks
 ```sh
 docker run --rm -p 8080:8080 \
   -e REVENUECAT_PROJECTS -e MCP_TOKEN -e MCP_READ_TOKEN -e MCP_READ_ONLY \
-  ghcr.io/dvcrn/mcp-server-revenuecat-org:latest
+  ghcr.io/dvcrn/mcp-server-revenuecat:latest
 ```
 
 ## Run on Cloudflare Workers
@@ -135,12 +135,12 @@ Example `.mcp.json` with separate read-write and read-only connectors:
 ```json
 {
   "mcpServers": {
-    "revenuecat-org": {
+    "revenuecat": {
       "type": "http",
       "url": "https://<worker>.<subdomain>.workers.dev/mcp",
       "headers": { "Authorization": "Bearer ${MCP_TOKEN}" }
     },
-    "revenuecat-org-readonly": {
+    "revenuecat-readonly": {
       "type": "http",
       "url": "https://<worker>.<subdomain>.workers.dev/mcp",
       "headers": { "Authorization": "Bearer ${MCP_READ_TOKEN}" }
@@ -222,7 +222,7 @@ Available only when `MCP_READ_ONLY` is unset/`false` and (over HTTP) when authen
 
 ## Direct REST API v2 vs. hosted MCP
 
-RevenueCat's hosted MCP (`https://mcp.revenuecat.ai/mcp`) accepts an `sk_...` secret key as a bearer token, but `mcp-server-revenuecat-org` calls `https://api.revenuecat.com/v2` directly instead of proxying it because:
+RevenueCat's hosted MCP (`https://mcp.revenuecat.ai/mcp`) accepts an `sk_...` secret key as a bearer token, but `mcp-server-revenuecat` calls `https://api.revenuecat.com/v2` directly instead of proxying it because:
 
 - Read-only mode executes pure `GET` requests against versioned v2 paths rather than filtering an unversioned upstream tool list where some `readOnlyHint` tools perform `POST` actions.
 - Every project-scoped tool accepts configured project aliases or allowlisted `proj...` IDs consistently, whereas hosted MCP tools omit project selectors on single-key endpoints or require raw `proj...` IDs.

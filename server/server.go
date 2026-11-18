@@ -16,7 +16,7 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/dvcrn/mcp-server-revenuecat-org/revenuecat"
+	"github.com/dvcrn/mcp-server-revenuecat/revenuecat"
 )
 
 var (
@@ -65,7 +65,7 @@ func readOnlyFromEnv(getenv func(string) string) (bool, error) {
 }
 
 func newServer(readOnly bool) *mcp.Server {
-	s := mcp.NewServer(&mcp.Implementation{Name: "revenuecat-org", Version: "0.1.0"}, nil)
+	s := mcp.NewServer(&mcp.Implementation{Name: "revenuecat", Version: "0.1.0"}, nil)
 	registerTools(registry{s: s, readOnly: readOnly})
 
 	return s

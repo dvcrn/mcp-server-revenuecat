@@ -5,7 +5,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/dvcrn/mcp-server-revenuecat-org/revenuecat"
+	"github.com/dvcrn/mcp-server-revenuecat/revenuecat"
 )
 
 type listCustomersInput struct {

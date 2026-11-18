@@ -1,5 +1,5 @@
 {
-  "name": "mcp-server-revenuecat-org-worker",
+  "name": "mcp-server-revenuecat-worker",
   "private": true,
   "scripts": {
     "build": "mise x go -- go run github.com/syumai/workers-go/cmd/workers-assets-gen -mode=go && GOOS=js GOARCH=wasm mise x go -- go build -trimpath -ldflags='-s -w' -o build/app.wasm ./cmd/mcp-worker"

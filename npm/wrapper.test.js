@@ -28,18 +28,18 @@ test("installBinary extracts via relative tar args and renames atomically under 
   fs.mkdirSync(fixtureDir);
   fs.mkdirSync(outDir);
 
-  const prevVersion = process.env.MCP_SERVER_REVENUECAT_ORG_VERSION;
-  const prevPlatform = process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM;
-  const prevArch = process.env.MCP_SERVER_REVENUECAT_ORG_ARCH;
-  const prevBase = process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL;
+  const prevVersion = process.env.MCP_SERVER_REVENUECAT_VERSION;
+  const prevPlatform = process.env.MCP_SERVER_REVENUECAT_PLATFORM;
+  const prevArch = process.env.MCP_SERVER_REVENUECAT_ARCH;
+  const prevBase = process.env.MCP_SERVER_REVENUECAT_BASE_URL;
 
   try {
-    process.env.MCP_SERVER_REVENUECAT_ORG_VERSION = "0.1.0";
-    process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM = "linux";
-    process.env.MCP_SERVER_REVENUECAT_ORG_ARCH = "amd64";
-    process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL = "https://example.invalid/releases";
+    process.env.MCP_SERVER_REVENUECAT_VERSION = "0.1.0";
+    process.env.MCP_SERVER_REVENUECAT_PLATFORM = "linux";
+    process.env.MCP_SERVER_REVENUECAT_ARCH = "amd64";
+    process.env.MCP_SERVER_REVENUECAT_BASE_URL = "https://example.invalid/releases";
 
-    const exe = "mcp-server-revenuecat-org";
+    const exe = "mcp-server-revenuecat";
     const assetName = `${exe}_0.1.0_linux_amd64.tar.gz`;
     const expectedPayload = "#!/bin/sh\necho ok\n";
     const archiveBuf = buildArchive(fixtureDir, exe, expectedPayload);
@@ -63,14 +63,14 @@ test("installBinary extracts via relative tar args and renames atomically under 
     const remaining = fs.readdirSync(outDir);
     assert.deepEqual(remaining, [exe]);
   } finally {
-    if (prevVersion === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_VERSION;
-    else process.env.MCP_SERVER_REVENUECAT_ORG_VERSION = prevVersion;
-    if (prevPlatform === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM;
-    else process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM = prevPlatform;
-    if (prevArch === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_ARCH;
-    else process.env.MCP_SERVER_REVENUECAT_ORG_ARCH = prevArch;
-    if (prevBase === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL;
-    else process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL = prevBase;
+    if (prevVersion === undefined) delete process.env.MCP_SERVER_REVENUECAT_VERSION;
+    else process.env.MCP_SERVER_REVENUECAT_VERSION = prevVersion;
+    if (prevPlatform === undefined) delete process.env.MCP_SERVER_REVENUECAT_PLATFORM;
+    else process.env.MCP_SERVER_REVENUECAT_PLATFORM = prevPlatform;
+    if (prevArch === undefined) delete process.env.MCP_SERVER_REVENUECAT_ARCH;
+    else process.env.MCP_SERVER_REVENUECAT_ARCH = prevArch;
+    if (prevBase === undefined) delete process.env.MCP_SERVER_REVENUECAT_BASE_URL;
+    else process.env.MCP_SERVER_REVENUECAT_BASE_URL = prevBase;
     fs.rmSync(workDir, { recursive: true, force: true });
   }
 });
@@ -82,18 +82,18 @@ test("installBinary rejects mismatched or missing checksums without writing binP
   fs.mkdirSync(fixtureDir);
   fs.mkdirSync(outDir);
 
-  const prevVersion = process.env.MCP_SERVER_REVENUECAT_ORG_VERSION;
-  const prevPlatform = process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM;
-  const prevArch = process.env.MCP_SERVER_REVENUECAT_ORG_ARCH;
-  const prevBase = process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL;
+  const prevVersion = process.env.MCP_SERVER_REVENUECAT_VERSION;
+  const prevPlatform = process.env.MCP_SERVER_REVENUECAT_PLATFORM;
+  const prevArch = process.env.MCP_SERVER_REVENUECAT_ARCH;
+  const prevBase = process.env.MCP_SERVER_REVENUECAT_BASE_URL;
 
   try {
-    process.env.MCP_SERVER_REVENUECAT_ORG_VERSION = "0.1.0";
-    process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM = "linux";
-    process.env.MCP_SERVER_REVENUECAT_ORG_ARCH = "amd64";
-    process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL = "https://example.invalid/releases";
+    process.env.MCP_SERVER_REVENUECAT_VERSION = "0.1.0";
+    process.env.MCP_SERVER_REVENUECAT_PLATFORM = "linux";
+    process.env.MCP_SERVER_REVENUECAT_ARCH = "amd64";
+    process.env.MCP_SERVER_REVENUECAT_BASE_URL = "https://example.invalid/releases";
 
-    const exe = "mcp-server-revenuecat-org";
+    const exe = "mcp-server-revenuecat";
     const assetName = `${exe}_0.1.0_linux_amd64.tar.gz`;
     const archiveBuf = buildArchive(fixtureDir, exe, "#!/bin/sh\necho tampered\n");
     const wrongSum = "0".repeat(64);
@@ -130,14 +130,14 @@ test("installBinary rejects mismatched or missing checksums without writing binP
     );
     assert.deepEqual(fs.readdirSync(outDir), []);
   } finally {
-    if (prevVersion === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_VERSION;
-    else process.env.MCP_SERVER_REVENUECAT_ORG_VERSION = prevVersion;
-    if (prevPlatform === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM;
-    else process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM = prevPlatform;
-    if (prevArch === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_ARCH;
-    else process.env.MCP_SERVER_REVENUECAT_ORG_ARCH = prevArch;
-    if (prevBase === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL;
-    else process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL = prevBase;
+    if (prevVersion === undefined) delete process.env.MCP_SERVER_REVENUECAT_VERSION;
+    else process.env.MCP_SERVER_REVENUECAT_VERSION = prevVersion;
+    if (prevPlatform === undefined) delete process.env.MCP_SERVER_REVENUECAT_PLATFORM;
+    else process.env.MCP_SERVER_REVENUECAT_PLATFORM = prevPlatform;
+    if (prevArch === undefined) delete process.env.MCP_SERVER_REVENUECAT_ARCH;
+    else process.env.MCP_SERVER_REVENUECAT_ARCH = prevArch;
+    if (prevBase === undefined) delete process.env.MCP_SERVER_REVENUECAT_BASE_URL;
+    else process.env.MCP_SERVER_REVENUECAT_BASE_URL = prevBase;
     fs.rmSync(workDir, { recursive: true, force: true });
   }
 });
@@ -156,7 +156,7 @@ test("index.js forwards SIGTERM to the spawned binary so the child is not orphan
 
     const markerPath = path.join(workDir, "child.pid");
     const termPath = path.join(workDir, "child.term");
-    const fakeBin = path.join(workDir, "mcp-server-revenuecat-org");
+    const fakeBin = path.join(workDir, "mcp-server-revenuecat");
     fs.writeFileSync(
       fakeBin,
       [

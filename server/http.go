@@ -8,7 +8,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/dvcrn/mcp-server-revenuecat-org/internal/httpclient"
+	"github.com/dvcrn/mcp-server-revenuecat/internal/httpclient"
 )
 
 // Handler serves GET /health and the MCP endpoint at /mcp. getenv is called

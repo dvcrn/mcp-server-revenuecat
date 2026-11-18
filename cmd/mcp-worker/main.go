@@ -9,7 +9,7 @@ import (
 	"github.com/syumai/workers-go"
 	"github.com/syumai/workers-go/cloudflare"
 
-	"github.com/dvcrn/mcp-server-revenuecat-org/server"
+	"github.com/dvcrn/mcp-server-revenuecat/server"
 )
 
 // A Workers isolate has 128 MB shared across concurrent requests, so the GC soft limit is half of that.

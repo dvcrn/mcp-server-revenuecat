@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dvcrn/mcp-server-revenuecat-org/internal/httpclient"
+	"github.com/dvcrn/mcp-server-revenuecat/internal/httpclient"
 )
 
 func TestClientGetBuildsRequestAndHeaders(t *testing.T) {
@@ -67,8 +67,8 @@ func TestClientGetBuildsRequestAndHeaders(t *testing.T) {
 	if gotAccept != "application/json" {
 		t.Fatalf("Accept = %q, want application/json", gotAccept)
 	}
-	if gotUA != "mcp-server-revenuecat-org" {
-		t.Fatalf("User-Agent = %q, want mcp-server-revenuecat-org", gotUA)
+	if gotUA != "mcp-server-revenuecat" {
+		t.Fatalf("User-Agent = %q, want mcp-server-revenuecat", gotUA)
 	}
 	if !strings.Contains(string(body), `"object":"customer"`) {
 		t.Fatalf("unexpected body: %s", body)

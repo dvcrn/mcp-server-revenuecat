@@ -8,8 +8,8 @@ const { startUpdateCheck } = require("./update_check");
 
 const exe =
   process.platform === "win32"
-    ? "mcp-server-revenuecat-org.exe"
-    : "mcp-server-revenuecat-org";
+    ? "mcp-server-revenuecat.exe"
+    : "mcp-server-revenuecat";
 const binPath = path.join(__dirname, exe);
 
 const PKG = (() => {
@@ -91,7 +91,7 @@ async function main() {
 
 main().catch((err) => {
   console.error(
-    `mcp-server-revenuecat-org: failed to install binary: ${err.message}`,
+    `mcp-server-revenuecat: failed to install binary: ${err.message}`,
   );
   process.exit(1);
 });

@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dvcrn/mcp-server-revenuecat-org/revenuecat"
+	"github.com/dvcrn/mcp-server-revenuecat/revenuecat"
 )
 
 // Environment variables the server reads.

@@ -14,8 +14,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/dvcrn/mcp-server-revenuecat-org/internal/httpclient"
-	"github.com/dvcrn/mcp-server-revenuecat-org/server"
+	"github.com/dvcrn/mcp-server-revenuecat/internal/httpclient"
+	"github.com/dvcrn/mcp-server-revenuecat/server"
 )
 
 func main() {
