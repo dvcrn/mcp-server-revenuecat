@@ -9,10 +9,7 @@ goreleaser = "2.19.0"
 
 [tasks.build-worker]
 description = "Build the Cloudflare Workers bundle into build/"
-run = """
-go run github.com/syumai/workers-go/cmd/workers-assets-gen -mode=go
-GOOS=js GOARCH=wasm go build -trimpath -ldflags='-s -w' -o ./build/app.wasm ./cmd/mcp-worker
-"""
+run = "bun run build"
 
 [tasks.dev-vars]
 description = "Write the gitignored .dev.vars for wrangler dev from the active fnox profile"
