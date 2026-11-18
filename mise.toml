@@ -1,0 +1,112 @@
+[tools]
+go = "1.26.3"
+wrangler = "4.156.1"
+jq = "1.8.1"
+goreleaser = "2.19.0"
+
+# Set CLOUDFLARE_ACCOUNT_ID in the gitignored mise.local.toml (or shell environment)
+# when deploying with CLOUDFLARE_API_TOKEN instead of `wrangler login`.
+
+[tasks.build-worker]
+description = "Build the Cloudflare Workers bundle into build/"
+run = """
+go run github.com/syumai/workers-go/cmd/workers-assets-gen -mode=go
+GOOS=js GOARCH=wasm go build -trimpath -ldflags='-s -w' -o ./build/app.wasm ./cmd/mcp-worker
+"""
+
+[tasks.dev-vars]
+description = "Write the gitignored .dev.vars for wrangler dev from the active fnox profile"
+run = '''
+set -eu
+secrets="$(scripts/worker-secrets.sh dev-json)"
+vars="$(printf %s "$secrets" | jq -r '
+  to_entries[]
+  | if .value | test("[\n'\'']") then error("\(.key) contains a newline or single quote")
+    else "\(.key)='\''\(.value)'\''" end
+')"
+rm -f .dev.vars
+umask 077
+printf '%s\n' "$vars" > .dev.vars
+'''
+
+[tasks.dev]
+description = "Run the worker locally with wrangler using secrets from the active fnox profile"
+depends = ["dev-vars"]
+run = "wrangler dev"
+
+[tasks.deploy]
+description = "Build and deploy the worker with the active fnox profile"
+run = "fnox exec -- wrangler deploy"
+
+[tasks.worker-secrets]
+description = "Upload live secrets (fnox production profile, projects.json) to the production worker"
+run = "scripts/worker-secrets.sh production"
+
+[tasks.preview-secrets]
+description = "Upload sandbox secrets (active fnox profile, projects.sandbox.json) to the Workers Previews base config"
+run = "scripts/worker-secrets.sh preview"
+
+[tasks.worker-projects]
+description = "Upload projects.json to the worker as the REVENUECAT_PROJECTS secret"
+run = '''
+set -eu
+projects="$(jq -Rse '
+  (try fromjson catch error("projects.json is not valid JSON")) as $arr
+  | if ($arr | type) != "array" or ($arr | length) == 0 then
+      error("projects.json must be a non-empty JSON array")
+    else . end
+  | reduce $arr[] as $p ({};
+      if ($p | type) != "object" then
+        error("projects.json entries must be JSON objects")
+      elif (($p.alias // "") | type) != "string" or (($p.alias // "") | startswith("sk_")) or ((($p.alias // "") | test("^[a-z0-9][a-z0-9_-]*$")) | not) then
+        error("projects.json: invalid alias")
+      elif (($p.project_id // "") | type) != "string" or ((($p.project_id // "") | test("^proj[A-Za-z0-9_-]+$")) | not) then
+        error("projects.json: invalid project_id for alias \($p.alias)")
+      elif (($p.api_key // "") | type) != "string" or ((($p.api_key // "") | test("^sk_[!-~]+$")) | not) then
+        error("projects.json: api_key for alias \($p.alias) must start with sk_")
+      elif $p.alias == $p.project_id or has($p.alias) or has($p.project_id) then
+        error("projects.json: duplicate alias or project_id for alias \($p.alias)")
+      else . + {($p.alias): true, ($p.project_id): true} end
+    )
+  | $arr | tojson
+' projects.json)"
+printf %s "$projects" | wrangler secret put REVENUECAT_PROJECTS
+'''
+
+[tasks.test]
+description = "Run Go tests with the race detector and npm wrapper tests"
+run = ["go test -race ./...", "node --test npm/wrapper.test.js"]
+
+[tasks.lint]
+description = "Vet the native and wasm builds"
+run = ["go vet ./...", "GOOS=js GOARCH=wasm go vet ./..."]
+
+[tasks.check]
+description = "Check formatting and that the worker compiles to wasm"
+run = """
+unformatted="$(gofmt -l .)"
+if [ -n "$unformatted" ]; then echo "gofmt needed:"; echo "$unformatted"; exit 1; fi
+GOOS=js GOARCH=wasm go build -o /dev/null ./cmd/mcp-worker
+"""
+
+[tasks.release-check]
+description = "Validate the GoReleaser config and build a local snapshot into dist/"
+run = ["goreleaser check", "goreleaser release --snapshot --clean"]
+
+[tasks.probe]
+description = "Probe configured RevenueCat API v2 key permissions without changing project data"
+usage = '''
+flag "-P --profile <profile>" help="fnox profile to load REVENUECAT_PROJECTS or REVENUECAT_TEST_API_KEY from"
+arg "[project]" help="configured project alias or proj... ID (default: all configured projects or $REVENUECAT_TEST_PROJECT_ID)"
+'''
+run = """
+if [ -n "${usage_profile:-}" ]; then
+  # Drop inherited secrets so a failed lookup cannot fall back to another profile's keys.
+  exec env -u REVENUECAT_PROJECTS -u REVENUECAT_TEST_API_KEY -u REVENUECAT_TEST_PROJECT_ID \
+    fnox -P "$usage_profile" exec -- scripts/probe-permissions.sh ${usage_project:+"$usage_project"}
+elif [ -n "${REVENUECAT_PROJECTS:-}" ] || [ -n "${REVENUECAT_TEST_API_KEY:-}" ]; then
+  exec scripts/probe-permissions.sh ${usage_project:+"$usage_project"}
+else
+  exec fnox exec -- scripts/probe-permissions.sh ${usage_project:+"$usage_project"}
+fi
+"""

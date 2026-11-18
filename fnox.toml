@@ -1,0 +1,15 @@
+[providers.1password]
+type = "1password"
+
+# Sandbox credentials for local dev and Workers Previews.
+[secrets]
+REVENUECAT_PROJECTS = { provider = "1password", value = "op://cloud-dev/RevenueCat - mcp-server-revenuecat-org sandbox/credential" }
+MCP_TOKEN = { provider = "1password", value = "op://cloud-dev/mcp-server-revenuecat-org-preview/password" }
+CLOUDFLARE_API_TOKEN = { provider = "1password", value = "op://cloud-dev/Cloudflare - mcp-server-revenuecat-org - worker deploy token/credential", if_missing = "ignore" }
+
+# Live credentials for the production worker.
+[profiles.production.secrets]
+REVENUECAT_PROJECTS = { provider = "1password", value = "op://Dev/RevenueCat - mcp-server-revenuecat-org/credential" }
+MCP_TOKEN = { provider = "1password", value = "op://Dev/mcp-server-revenuecat-org-prod/password" }
+# Optional: worker-secrets uploads it only when this item exists.
+MCP_READ_TOKEN = { provider = "1password", value = "op://Dev/mcp-server-revenuecat-org-prod-readonly/password", if_missing = "ignore" }

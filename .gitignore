@@ -1,0 +1,13 @@
+fnox.local.toml
+.fnox.local.toml
+.dev.vars
+build/
+node_modules/
+.wrangler/
+mise.local.toml
+dist/
+npm/node_modules/
+npm/mcp-server-revenuecat-org
+npm/mcp-server-revenuecat-org.exe
+projects.json
+projects.sandbox.json

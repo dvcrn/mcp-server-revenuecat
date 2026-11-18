@@ -1,0 +1,4 @@
+[
+  { "alias": "ios_app", "name": "Dummy iOS App", "project_id": "proj1ab2c3d4", "api_key": "sk_dummy_projectA" },
+  { "alias": "android_app", "name": "Dummy Android App", "project_id": "proj5ef6g7h8", "api_key": "sk_dummy_projectB" }
+]

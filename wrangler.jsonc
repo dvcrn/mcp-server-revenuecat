@@ -1,0 +1,20 @@
+{
+  "name": "mcp-server-revenuecat-org",
+  "main": "build/worker.mjs",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "build": {
+    "command": "mise run build-worker",
+    "watch_dir": ["cmd", "internal", "server", "revenuecat"]
+  },
+  "observability": {
+    "enabled": true
+  },
+  "limits": {
+    "cpu_ms": 30000
+  },
+  "previews": {}
+  // Secrets: REVENUECAT_PROJECTS, MCP_TOKEN, and optional MCP_READ_TOKEN / MCP_READ_ONLY
+  // (live via `mise run worker-secrets`, sandbox for Previews via `mise run preview-secrets`).
+  // REVENUECAT_PROJECTS is a secret because each entry contains a project_id and sk_ API key.
+}
