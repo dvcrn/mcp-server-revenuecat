@@ -111,7 +111,7 @@ type customerAttributeValue struct {
 
 type createCustomerInput struct {
 	Project    string                   `json:"project" jsonschema:"Configured project alias (see list_projects) or RevenueCat proj... ID."`
-	ID         string                   `json:"id" jsonschema:"App User ID for the new customer."`
+	ID         string                   `json:"id" jsonschema:"App User ID for the new customer (ASCII letters, digits, underscores, and hyphens: [0-9a-zA-Z_-]+)."`
 	Attributes []customerAttributeValue `json:"attributes,omitempty" jsonschema:"Optional initial customer attributes to set on creation."`
 }
 
@@ -245,6 +245,17 @@ func registerCustomerWriteTools(r registry) {
 	}, refundPurchase)
 }
 
+func isValidNewCustomerID(s string) bool {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || c == '-' {
+			continue
+		}
+		return false
+	}
+	return len(s) > 0
+}
+
 func createCustomer(ctx context.Context, env *Env, in createCustomerInput) (*mcp.CallToolResult, any, error) {
 	p, err := env.resolveProject(in.Project)
 	if err != nil {
@@ -255,8 +266,8 @@ func createCustomer(ctx context.Context, env *Env, in createCustomerInput) (*mcp
 	if err != nil {
 		return nil, nil, err
 	}
-	if customerID == "." || customerID == ".." {
-		return nil, nil, fmt.Errorf("id cannot be %q", customerID)
+	if !isValidNewCustomerID(customerID) {
+		return nil, nil, fmt.Errorf("id must contain only ASCII letters, digits, underscores, and hyphens ([0-9a-zA-Z_-]+)")
 	}
 
 	body := map[string]any{"id": customerID}

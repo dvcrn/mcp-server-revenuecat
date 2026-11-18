@@ -81,6 +81,9 @@ async function main() {
     for (const [sig, listener] of signalListeners) {
       process.off(sig, listener);
     }
+    try {
+      updateAbort.abort();
+    } catch {}
     console.error(err.message);
     process.exitCode = 1;
   });

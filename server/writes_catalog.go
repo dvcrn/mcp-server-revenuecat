@@ -12,10 +12,10 @@ type createProductInput struct {
 	Project              string `json:"project" jsonschema:"Configured project alias (see list_projects) or RevenueCat proj... ID."`
 	StoreIdentifier      string `json:"store_identifier" jsonschema:"Store product identifier, such as com.example.pro.monthly."`
 	AppID                string `json:"app_id" jsonschema:"RevenueCat app ID (app...) that owns this product."`
-	Type                 string `json:"type" jsonschema:"Product type: subscription, one_time, consumable, non_consumable, or non_renewing_subscription."`
-	DisplayName          string `json:"display_name,omitempty" jsonschema:"Optional human-readable display name."`
-	SubscriptionDuration string `json:"subscription_duration,omitempty" jsonschema:"Optional ISO 8601 duration (such as P1W, P1M, P3M, P6M, P1Y) when creating a Test Store subscription product."`
-	Title                string `json:"title,omitempty" jsonschema:"Optional user-facing title for Test Store products."`
+	Type                 string `json:"type" jsonschema:"Product type: subscription, one_time (Web Billing/Stripe), consumable, non_consumable, or non_renewing_subscription. Test Store apps accept subscription, consumable, and non_consumable."`
+	DisplayName          string `json:"display_name,omitempty" jsonschema:"Optional internal display name."`
+	SubscriptionDuration string `json:"subscription_duration,omitempty" jsonschema:"ISO 8601 duration (P1W, P1M, P2M, P3M, P6M, or P1Y), required when creating a Test Store subscription product."`
+	Title                string `json:"title,omitempty" jsonschema:"User-facing product title, required for Test Store products."`
 }
 
 type deleteProductInput struct {
@@ -56,8 +56,8 @@ type createOfferingInput struct {
 type updateOfferingInput struct {
 	Project       string         `json:"project" jsonschema:"Configured project alias (see list_projects) or RevenueCat proj... ID."`
 	OfferingID    string         `json:"offering_id" jsonschema:"RevenueCat offering ID (ofrng...)."`
-	DisplayName   *string        `json:"display_name,omitempty" jsonschema:"Updated human-readable display name."`
-	IsCurrent     *bool          `json:"is_current,omitempty" jsonschema:"Whether this offering is the default offering returned to apps."`
+	DisplayName   *string        `json:"display_name,omitempty" jsonschema:"Updated human-readable display name (must be unique within the project)."`
+	IsCurrent     *bool          `json:"is_current,omitempty" jsonschema:"Set true to promote this offering to the default offering returned to apps (false is rejected; promote another offering instead)."`
 	Metadata      map[string]any `json:"metadata,omitempty" jsonschema:"Replacement custom metadata object. Mutually exclusive with clear_metadata."`
 	ClearMetadata bool           `json:"clear_metadata,omitempty" jsonschema:"Whether to clear custom metadata on this offering."`
 }
@@ -155,13 +155,13 @@ func registerCatalogWriteTools(r registry) {
 
 	add(r, &mcp.Tool{
 		Name:        "update_offering",
-		Description: "Update an offering's `display_name`, `is_current` flag, or `metadata`. Changing `is_current` switches the default offering returned to apps, so confirm with the user first.",
+		Description: "Update an offering's `display_name`, promote it with `is_current: true`, or set/clear `metadata`. Setting `is_current: true` switches the default offering returned to apps, so confirm with the user first.",
 		Annotations: destructive(),
 	}, updateOffering)
 
 	add(r, &mcp.Tool{
 		Name:        "delete_offering",
-		Description: "Delete an offering and its packages from a RevenueCat project by `offering_id`. Confirm with the user first.",
+		Description: "Delete a non-default offering and its packages by `offering_id`. If the offering has `is_current: true`, promote another offering with `update_offering` first. Confirm with the user first.",
 		Annotations: destructive(),
 	}, deleteOffering)
 
@@ -420,7 +420,10 @@ func updateOffering(ctx context.Context, env *Env, in updateOfferingInput) (*mcp
 		body["display_name"] = dn
 	}
 	if in.IsCurrent != nil {
-		body["is_current"] = *in.IsCurrent
+		if !*in.IsCurrent {
+			return nil, nil, fmt.Errorf("is_current cannot be set to false; set is_current: true on another offering to switch the default offering")
+		}
+		body["is_current"] = true
 	}
 	if in.ClearMetadata {
 		body["metadata"] = nil

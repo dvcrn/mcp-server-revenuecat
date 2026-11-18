@@ -212,8 +212,8 @@ Available only when `MCP_READ_ONLY` is unset/`false` and (over HTTP) when authen
 | `attach_entitlement_products` | `POST /v2/projects/{project_id}/entitlements/{entitlement_id}/actions/attach_products` | Attach products to an entitlement |
 | `detach_entitlement_products` | `POST /v2/projects/{project_id}/entitlements/{entitlement_id}/actions/detach_products` | Detach products from an entitlement |
 | `create_offering` | `POST /v2/projects/{project_id}/offerings` | Create an offering |
-| `update_offering` | `POST /v2/projects/{project_id}/offerings/{offering_id}` | Update an offering's `display_name`, `is_current`, or `metadata` |
-| `delete_offering` | `DELETE /v2/projects/{project_id}/offerings/{offering_id}` | Delete an offering and its packages |
+| `update_offering` | `POST /v2/projects/{project_id}/offerings/{offering_id}` | Update an offering's `display_name`, promote it with `is_current: true`, or set/clear `metadata` |
+| `delete_offering` | `DELETE /v2/projects/{project_id}/offerings/{offering_id}` | Delete a non-default offering and its packages |
 | `create_offering_package` | `POST /v2/projects/{project_id}/offerings/{offering_id}/packages` | Create a package inside an offering |
 | `update_package` | `POST /v2/projects/{project_id}/packages/{package_id}` | Update a package's `display_name` or `position` |
 | `delete_package` | `DELETE /v2/projects/{project_id}/packages/{package_id}` | Delete a package |

@@ -75,6 +75,73 @@ test("installBinary extracts via relative tar args and renames atomically under 
   }
 });
 
+test("installBinary rejects mismatched or missing checksums without writing binPath", async () => {
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "rc-npm-sum-"));
+  const fixtureDir = path.join(workDir, "fixture");
+  const outDir = path.join(workDir, "out");
+  fs.mkdirSync(fixtureDir);
+  fs.mkdirSync(outDir);
+
+  const prevVersion = process.env.MCP_SERVER_REVENUECAT_ORG_VERSION;
+  const prevPlatform = process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM;
+  const prevArch = process.env.MCP_SERVER_REVENUECAT_ORG_ARCH;
+  const prevBase = process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL;
+
+  try {
+    process.env.MCP_SERVER_REVENUECAT_ORG_VERSION = "0.1.0";
+    process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM = "linux";
+    process.env.MCP_SERVER_REVENUECAT_ORG_ARCH = "amd64";
+    process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL = "https://example.invalid/releases";
+
+    const exe = "mcp-server-revenuecat-org";
+    const assetName = `${exe}_0.1.0_linux_amd64.tar.gz`;
+    const archiveBuf = buildArchive(fixtureDir, exe, "#!/bin/sh\necho tampered\n");
+    const wrongSum = "0".repeat(64);
+
+    await assert.rejects(
+      () =>
+        installBinary({
+          outDir,
+          fetchBuffer: async (url) => {
+            if (url.endsWith(`/${assetName}`)) return archiveBuf;
+            if (url.endsWith("/checksums.txt")) {
+              return Buffer.from(`${wrongSum}  ${assetName}\n`, "utf8");
+            }
+            throw new Error(`unexpected URL ${url}`);
+          },
+        }),
+      /checksum mismatch/,
+    );
+    assert.deepEqual(fs.readdirSync(outDir), []);
+
+    await assert.rejects(
+      () =>
+        installBinary({
+          outDir,
+          fetchBuffer: async (url) => {
+            if (url.endsWith(`/${assetName}`)) return archiveBuf;
+            if (url.endsWith("/checksums.txt")) {
+              return Buffer.from(`${wrongSum}  other_asset.tar.gz\n`, "utf8");
+            }
+            throw new Error(`unexpected URL ${url}`);
+          },
+        }),
+      /missing from checksums\.txt/,
+    );
+    assert.deepEqual(fs.readdirSync(outDir), []);
+  } finally {
+    if (prevVersion === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_VERSION;
+    else process.env.MCP_SERVER_REVENUECAT_ORG_VERSION = prevVersion;
+    if (prevPlatform === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM;
+    else process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM = prevPlatform;
+    if (prevArch === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_ARCH;
+    else process.env.MCP_SERVER_REVENUECAT_ORG_ARCH = prevArch;
+    if (prevBase === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL;
+    else process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL = prevBase;
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
 test("index.js forwards SIGTERM to the spawned binary so the child is not orphaned", async (t) => {
   if (process.platform === "win32") {
     t.skip("POSIX signal forwarding check");

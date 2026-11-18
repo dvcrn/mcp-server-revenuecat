@@ -590,7 +590,26 @@ func TestWriteToolValidationErrors(t *testing.T) {
 				"project": "ios_prod",
 				"id":      "..",
 			},
-			want: "id cannot be",
+			want: "ASCII letters, digits, underscores, and hyphens",
+		},
+		{
+			name: "create_customer rejects non-[0-9a-zA-Z_-] characters",
+			tool: "create_customer",
+			args: map[string]any{
+				"project": "ios_prod",
+				"id":      "user@example.com",
+			},
+			want: "ASCII letters, digits, underscores, and hyphens",
+		},
+		{
+			name: "update_offering rejects is_current=false silent no-op",
+			tool: "update_offering",
+			args: map[string]any{
+				"project":     "ios_prod",
+				"offering_id": "ofrng_dummy_1",
+				"is_current":  false,
+			},
+			want: "is_current cannot be set to false",
 		},
 		{
 			name: "transfer_customer rejects same source and target",

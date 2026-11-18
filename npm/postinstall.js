@@ -30,7 +30,13 @@ function httpGet(url, { headers } = {}, redirectsLeft = MAX_REDIRECTS) {
           reject(new Error(`GET ${url} -> too many redirects`));
           return;
         }
-        const nextUrl = new URL(res.headers.location, url).toString();
+        let nextUrl;
+        try {
+          nextUrl = new URL(res.headers.location, url).toString();
+        } catch (err) {
+          reject(err);
+          return;
+        }
         resolve(httpGet(nextUrl, { headers }, redirectsLeft - 1));
         return;
       }
@@ -40,6 +46,12 @@ function httpGet(url, { headers } = {}, redirectsLeft = MAX_REDIRECTS) {
         return;
       }
       const chunks = [];
+      res.on("error", reject);
+      res.on("close", () => {
+        if (!res.complete) {
+          reject(new Error(`GET ${url} -> truncated response`));
+        }
+      });
       res.on("data", (c) => chunks.push(c));
       res.on("end", () => resolve(Buffer.concat(chunks)));
     });
