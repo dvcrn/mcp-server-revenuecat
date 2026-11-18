@@ -14,7 +14,7 @@ ARG TARGETOS
 ARG TARGETARCH
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w -buildid=" \
-    -o mcp-server-revenuecat ./cmd/mcp
+    -o mcp-server-revenuecat ./cmd/mcp-server-revenuecat
 
 FROM alpine:3.22
 

@@ -4,7 +4,7 @@ project_name: mcp-server-revenuecat
 
 builds:
   - id: mcp-server-revenuecat
-    main: ./cmd/mcp
+    main: ./cmd/mcp-server-revenuecat
     binary: mcp-server-revenuecat
     env:
       - CGO_ENABLED=0
