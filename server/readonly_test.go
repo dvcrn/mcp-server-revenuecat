@@ -9,8 +9,6 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-
-	"github.com/dvcrn/mcp-server-revenuecat-org/revenuecat"
 )
 
 const (
@@ -204,31 +202,10 @@ func TestHTTPAccessLevelsAndTokens(t *testing.T) {
 func TestReadOnlyServerCannotCallAnyWriteTool(t *testing.T) {
 	t.Parallel()
 
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	session, ctx := newTestSession(t, NewReadOnly(), func(w http.ResponseWriter, r *http.Request) {
 		t.Errorf("unexpected upstream HTTP call from read-only server: %s %s", r.Method, r.URL.Path)
 		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer upstream.Close()
-
-	env, err := NewEnv(dummyProjectsJSON, upstream.Client(), revenuecat.WithBaseURL(upstream.URL))
-	if err != nil {
-		t.Fatalf("NewEnv error: %v", err)
-	}
-
-	ctx := WithEnv(context.Background(), env)
-	clientTransport, serverTransport := mcp.NewInMemoryTransports()
-	serverSession, err := NewReadOnly().Connect(ctx, serverTransport, nil)
-	if err != nil {
-		t.Fatalf("server Connect: %v", err)
-	}
-	defer serverSession.Close()
-
-	client := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "1.0"}, nil)
-	session, err := client.Connect(ctx, clientTransport, nil)
-	if err != nil {
-		t.Fatalf("client Connect: %v", err)
-	}
-	defer session.Close()
+	})
 
 	writeTools := allWriteToolNames()
 	if len(writeTools) != expectedWriteToolCount {
@@ -238,7 +215,7 @@ func TestReadOnlyServerCannotCallAnyWriteTool(t *testing.T) {
 	for _, name := range writeTools {
 		_, err := session.CallTool(ctx, &mcp.CallToolParams{
 			Name:      name,
-			Arguments: map[string]any{"project": "alpha"},
+			Arguments: map[string]any{"project": "ios_prod"},
 		})
 		if err == nil {
 			t.Errorf("read-only server allowed CallTool(%q), want unknown-tool error", name)
@@ -257,6 +234,25 @@ func (b bearerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return b.base.RoundTrip(clone)
 }
 
+func newHTTPClientSession(t *testing.T, ctx context.Context, endpoint, token string) *mcp.ClientSession {
+	t.Helper()
+
+	httpClient := &http.Client{
+		Transport: bearerTransport{token: token, base: http.DefaultTransport},
+	}
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-http", Version: "1.0"}, nil)
+	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{
+		Endpoint:   endpoint,
+		HTTPClient: httpClient,
+	}, nil)
+	if err != nil {
+		t.Fatalf("MCP HTTP Connect(%s): %v", token, err)
+	}
+	t.Cleanup(func() { _ = session.Close() })
+
+	return session
+}
+
 func TestHTTPReadTokenRejectsWriteCallWhileFullTokenSucceeds(t *testing.T) {
 	t.Parallel()
 
@@ -269,23 +265,7 @@ func TestHTTPReadTokenRejectsWriteCallWhileFullTokenSucceeds(t *testing.T) {
 	ts := httptest.NewServer(Handler(func(k string) string { return vars[k] }))
 	defer ts.Close()
 
-	connect := func(token string) *mcp.ClientSession {
-		httpClient := &http.Client{
-			Transport: bearerTransport{token: token, base: http.DefaultTransport},
-		}
-		client := mcp.NewClient(&mcp.Implementation{Name: "test-http", Version: "1.0"}, nil)
-		session, err := client.Connect(ctx, &mcp.StreamableClientTransport{
-			Endpoint:   ts.URL + "/mcp",
-			HTTPClient: httpClient,
-		}, nil)
-		if err != nil {
-			t.Fatalf("Connect(%s): %v", token, err)
-		}
-		t.Cleanup(func() { _ = session.Close() })
-		return session
-	}
-
-	readSession := connect("dummy-read-token")
+	readSession := newHTTPClientSession(t, ctx, ts.URL+"/mcp", "dummy-read-token")
 	if _, err := readSession.CallTool(ctx, &mcp.CallToolParams{
 		Name:      "delete_product",
 		Arguments: map[string]any{"project": "alpha", "product_id": "prod_dummy"},
@@ -293,7 +273,7 @@ func TestHTTPReadTokenRejectsWriteCallWhileFullTokenSucceeds(t *testing.T) {
 		t.Fatal("MCP_READ_TOKEN CallTool(delete_product) succeeded, want unknown-tool error")
 	}
 
-	fullSession := connect("dummy-full-token")
+	fullSession := newHTTPClientSession(t, ctx, ts.URL+"/mcp", "dummy-full-token")
 	res, err := fullSession.CallTool(ctx, &mcp.CallToolParams{
 		Name: "list_projects",
 	})
@@ -317,20 +297,7 @@ func TestHTTPReadTokenRejectsWriteCallWhileFullTokenSucceeds(t *testing.T) {
 func listHTTPClientTools(t *testing.T, ctx context.Context, endpoint, token string) []*mcp.Tool {
 	t.Helper()
 
-	httpClient := &http.Client{
-		Transport: bearerTransport{token: token, base: http.DefaultTransport},
-	}
-	transport := &mcp.StreamableClientTransport{
-		Endpoint:   endpoint,
-		HTTPClient: httpClient,
-	}
-	client := mcp.NewClient(&mcp.Implementation{Name: "test-http", Version: "1.0"}, nil)
-	session, err := client.Connect(ctx, transport, nil)
-	if err != nil {
-		t.Fatalf("MCP HTTP Connect failed: %v", err)
-	}
-	defer session.Close()
-
+	session := newHTTPClientSession(t, ctx, endpoint, token)
 	res, err := session.ListTools(ctx, nil)
 	if err != nil {
 		t.Fatalf("ListTools failed: %v", err)

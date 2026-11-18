@@ -102,12 +102,27 @@ function fetchLatestVersion(packageName, timeoutMs, signal) {
   });
 }
 
-function normalizeVersion(semver, version) {
-  if (!version) return "";
-  const cleaned = semver.clean(version);
-  if (cleaned) return cleaned;
-  const coerced = semver.coerce(version);
-  return coerced ? semver.valid(coerced) || "" : "";
+function parseVersion(raw) {
+  if (typeof raw !== "string") return null;
+  const m = raw
+    .trim()
+    .match(/^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/);
+  if (!m) return null;
+  const tuple = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (!tuple.every(Number.isSafeInteger)) return null;
+  return { version: `${tuple[0]}.${tuple[1]}.${tuple[2]}`, tuple };
+}
+
+function isNewerVersion(latestRaw, installedRaw) {
+  const latest = parseVersion(latestRaw);
+  const installed = parseVersion(installedRaw);
+  if (!latest || !installed) return false;
+  for (let i = 0; i < 3; i++) {
+    if (latest.tuple[i] !== installed.tuple[i]) {
+      return latest.tuple[i] > installed.tuple[i];
+    }
+  }
+  return false;
 }
 
 function printNotice({ packageName, installed, latest, updateCommand }) {
@@ -130,15 +145,9 @@ async function runUpdateCheck({
   if (isDisabled()) return;
   if (!process.stderr.isTTY) return;
 
-  let semver;
-  try {
-    semver = require("semver");
-  } catch {
-    return;
-  }
-
-  const installed = normalizeVersion(semver, installedVersion);
-  if (!installed) return;
+  const installedParsed = parseVersion(installedVersion);
+  if (!installedParsed) return;
+  const installed = installedParsed.version;
 
   const cache = readCache() || {};
   const lastChecked = Number.isFinite(cache.lastChecked) ? cache.lastChecked : 0;
@@ -150,13 +159,13 @@ async function runUpdateCheck({
   const now = Date.now();
 
   if (lastChecked && now - lastChecked < UPDATE_CHECK_INTERVAL_MS) {
-    const latestCached = normalizeVersion(semver, cachedLatest);
-    if (latestCached && semver.gt(latestCached, installed)) {
+    const cachedParsed = parseVersion(cachedLatest);
+    if (cachedParsed && isNewerVersion(cachedParsed.version, installed)) {
       if (!lastNotified || now - lastNotified >= UPDATE_CHECK_INTERVAL_MS) {
         printNotice({
           packageName,
           installed,
-          latest: latestCached,
+          latest: cachedParsed.version,
           updateCommand,
         });
         writeCache({ ...cache, lastNotified: now });
@@ -170,11 +179,12 @@ async function runUpdateCheck({
     UPDATE_CHECK_TIMEOUT_MS,
     signal,
   );
-  const latest = normalizeVersion(semver, latestRaw);
+  const latestParsed = parseVersion(latestRaw);
+  const latest = latestParsed ? latestParsed.version : "";
 
   writeCache({ lastChecked: now, lastNotified, latest: latest || latestRaw });
 
-  if (latest && semver.gt(latest, installed)) {
+  if (latest && isNewerVersion(latest, installed)) {
     if (!lastNotified || now - lastNotified >= UPDATE_CHECK_INTERVAL_MS) {
       printNotice({ packageName, installed, latest, updateCommand });
       writeCache({ lastChecked: now, lastNotified: now, latest });
@@ -198,4 +208,6 @@ function startUpdateCheck({
 
 module.exports = {
   startUpdateCheck,
+  parseVersion,
+  isNewerVersion,
 };

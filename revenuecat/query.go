@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"unicode"
 )
 
 // Query builds URL query parameters using RevenueCat v2 conventions (repeated
@@ -19,13 +18,13 @@ func NewQuery() *Query {
 	return &Query{values: url.Values{}}
 }
 
-// SetString sets key when val is non-empty, rejecting control characters.
+// SetString sets key when val is non-empty, rejecting invalid UTF-8 and control characters.
 func (q *Query) SetString(key, val string) error {
 	if val == "" {
 		return nil
 	}
-	if hasControl(val) {
-		return fmt.Errorf("revenuecat: invalid control character in %s", key)
+	if HasControlOrInvalidUTF8(val) {
+		return fmt.Errorf("revenuecat: invalid characters in %s", key)
 	}
 	q.values.Set(key, val)
 	return nil
@@ -66,8 +65,8 @@ func (q *Query) AddStrings(key string, vals []string) error {
 		if trimmed == "" {
 			return fmt.Errorf("revenuecat: %s cannot contain empty values", key)
 		}
-		if hasControl(trimmed) {
-			return fmt.Errorf("revenuecat: invalid control character in %s", key)
+		if HasControlOrInvalidUTF8(trimmed) {
+			return fmt.Errorf("revenuecat: invalid characters in %s", key)
 		}
 		q.values.Add(key, trimmed)
 	}
@@ -77,13 +76,4 @@ func (q *Query) AddStrings(key string, vals []string) error {
 // Values returns the built url.Values.
 func (q *Query) Values() url.Values {
 	return q.values
-}
-
-func hasControl(s string) bool {
-	for _, r := range s {
-		if r < 0x20 || r == 0x7f || unicode.IsControl(r) {
-			return true
-		}
-	}
-	return false
 }

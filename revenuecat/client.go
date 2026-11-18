@@ -84,7 +84,7 @@ func (c *Client) Get(ctx context.Context, endpoint string, segments []string, qu
 // Post sends an HTTP POST request to /v2/<segments...>. When body is non-nil it
 // is JSON-encoded with Content-Type application/json; pass nil for bodyless
 // action endpoints such as actions/cancel and actions/refund.
-func (c *Client) Post(ctx context.Context, endpoint string, segments []string, query url.Values, body any) ([]byte, error) {
+func (c *Client) Post(ctx context.Context, endpoint string, segments []string, body any) ([]byte, error) {
 	if isReadOnly(ctx) {
 		return nil, ErrReadOnly
 	}
@@ -105,7 +105,7 @@ func (c *Client) Post(ctx context.Context, endpoint string, segments []string, q
 		contentType = "application/json"
 	}
 
-	return c.do(ctx, http.MethodPost, endpoint, segments, query, reader, contentType)
+	return c.do(ctx, http.MethodPost, endpoint, segments, nil, reader, contentType)
 }
 
 // Delete sends an HTTP DELETE request to /v2/<segments...>.
@@ -174,17 +174,27 @@ func (c *Client) do(ctx context.Context, method, endpoint string, segments []str
 	return data, nil
 }
 
+// HasControlOrInvalidUTF8 reports whether s contains invalid UTF-8 bytes or
+// Unicode control characters (including ASCII < 0x20 and 0x7f).
+func HasControlOrInvalidUTF8(s string) bool {
+	if !utf8.ValidString(s) {
+		return true
+	}
+
+	for _, r := range s {
+		if unicode.IsControl(r) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // checkSegment rejects empty, dot-traversal, invalid UTF-8, or control-character
 // path segments before url.PathEscape runs (url.PathEscape leaves "." and ".." intact).
 func checkSegment(seg string) error {
-	if seg == "" || seg == "." || seg == ".." || !utf8.ValidString(seg) {
+	if seg == "" || seg == "." || seg == ".." || HasControlOrInvalidUTF8(seg) {
 		return errors.New("invalid path segment")
-	}
-
-	for _, r := range seg {
-		if r < 0x20 || r == 0x7f || unicode.IsControl(r) {
-			return errors.New("invalid control character in path segment")
-		}
 	}
 
 	return nil

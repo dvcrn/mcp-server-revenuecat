@@ -9,10 +9,6 @@ const { spawnSync } = require("child_process");
 const OWNER = "dvcrn";
 const REPO = "mcp-server-revenuecat-org";
 const BIN = "mcp-server-revenuecat-org";
-const VERSION_ENV = "MCP_SERVER_REVENUECAT_ORG_VERSION";
-const BASE_URL_ENV = "MCP_SERVER_REVENUECAT_ORG_BASE_URL";
-const ARCH_ENV = "MCP_SERVER_REVENUECAT_ORG_ARCH";
-const PLATFORM_ENV = "MCP_SERVER_REVENUECAT_ORG_PLATFORM";
 const REQUEST_TIMEOUT_MS = 15000;
 const MAX_REDIRECTS = 5;
 
@@ -63,9 +59,7 @@ function httpGet(url, { headers } = {}, redirectsLeft = MAX_REDIRECTS) {
 }
 
 function sha256(buf) {
-  const h = crypto.createHash("sha256");
-  h.update(buf);
-  return h.digest("hex");
+  return crypto.createHash("sha256").update(buf).digest("hex");
 }
 
 function parseChecksums(text) {
@@ -94,8 +88,19 @@ function parseChecksums(text) {
   return map;
 }
 
-async function installBinary({ outDir = __dirname, fetchBuffer = httpGet } = {}) {
-  const platformRaw = process.env[PLATFORM_ENV] || process.platform;
+function readPackageVersion() {
+  const pkg = JSON.parse(
+    fs.readFileSync(path.join(__dirname, "package.json"), "utf8"),
+  );
+  return pkg.version || "";
+}
+
+function resolveTarget({
+  platformRaw = process.platform,
+  archRaw = process.arch,
+  version,
+  baseUrl,
+} = {}) {
   const platform = platformRaw === "win32" ? "windows" : platformRaw;
   if (!["darwin", "linux", "windows"].includes(platform)) {
     throw new Error(
@@ -103,54 +108,40 @@ async function installBinary({ outDir = __dirname, fetchBuffer = httpGet } = {})
     );
   }
 
-  const pkg = JSON.parse(
-    fs.readFileSync(path.join(__dirname, "package.json"), "utf8"),
-  );
-  const version = process.env[VERSION_ENV] || pkg.version || "";
-  if (!version) {
+  const cleanVersion =
+    typeof version === "string" ? version.trim().replace(/^v/, "") : "";
+  if (!cleanVersion) {
     throw new Error("postinstall: could not determine version");
   }
 
-  const detectedArch =
-    process.arch === "x64"
+  const arch =
+    archRaw === "x64"
       ? "amd64"
-      : process.arch === "arm64"
+      : archRaw === "arm64"
         ? "arm64"
-        : process.arch === "arm"
+        : archRaw === "arm"
           ? "armv7"
-          : process.arch;
-  const arch = process.env[ARCH_ENV] || detectedArch;
+          : archRaw;
   if (!["amd64", "arm64", "armv7"].includes(arch)) {
     throw new Error(`Unsupported arch: ${arch}`);
   }
-  if (platform === "windows" && arch === "armv7") {
-    throw new Error(`Unsupported Windows arch: ${arch}`);
+  if (platform !== "linux" && arch === "armv7") {
+    throw new Error(`Unsupported ${platform} arch: ${arch}`);
   }
 
-  const assetName = `${BIN}_${version}_${platform}_${arch}.tar.gz`;
-  const baseOverride = process.env[BASE_URL_ENV];
-  const bases = baseOverride
-    ? [baseOverride]
+  const exe = platform === "windows" ? `${BIN}.exe` : BIN;
+  const assetName = `${BIN}_${cleanVersion}_${platform}_${arch}.tar.gz`;
+  const bases = baseUrl
+    ? [baseUrl.replace(/\/+$/, "")]
     : [
-        `https://github.com/${OWNER}/${REPO}/releases/download/${version}`,
-        `https://github.com/${OWNER}/${REPO}/releases/download/v${version}`,
+        `https://github.com/${OWNER}/${REPO}/releases/download/${cleanVersion}`,
+        `https://github.com/${OWNER}/${REPO}/releases/download/v${cleanVersion}`,
       ];
 
-  const headers = { "User-Agent": `${REPO}-postinstall` };
-  const exe = platform === "windows" ? `${BIN}.exe` : BIN;
-  const binPath = path.join(outDir, exe);
+  return { platform, arch, exe, assetName, bases };
+}
 
-  if (fs.existsSync(binPath)) {
-    if (platform !== "windows") {
-      try {
-        if ((fs.statSync(binPath).mode & 0o111) === 0) {
-          fs.chmodSync(binPath, 0o755);
-        }
-      } catch {}
-    }
-    return;
-  }
-
+async function downloadVerifiedArchive(fetchBuffer, { assetName, bases, headers }) {
   let tarGz = null;
   let baseUsed = "";
   let lastErr = null;
@@ -167,19 +158,19 @@ async function installBinary({ outDir = __dirname, fetchBuffer = httpGet } = {})
   }
   if (!tarGz) throw lastErr || new Error("failed to download binary");
 
-  const checksumsUrl = `${baseUsed}/checksums.txt`;
-  const checksumsBuf = await fetchBuffer(checksumsUrl, { headers });
-  const checksums = parseChecksums(checksumsBuf.toString("utf8"));
-  const sumExpected = checksums.get(assetName);
+  const checksumsBuf = await fetchBuffer(`${baseUsed}/checksums.txt`, { headers });
+  const sumExpected = parseChecksums(checksumsBuf.toString("utf8")).get(assetName);
   if (!sumExpected) {
     throw new Error(`postinstall: ${assetName} missing from checksums.txt`);
   }
-  const sumActual = sha256(tarGz);
-  if (sumActual.toLowerCase() !== sumExpected.toLowerCase()) {
+  if (sha256(tarGz).toLowerCase() !== sumExpected.toLowerCase()) {
     throw new Error("postinstall: checksum mismatch");
   }
   console.error("postinstall: checksum OK");
+  return tarGz;
+}
 
+function extractArchiveToBin(tarGz, { outDir, assetName, exe, binPath, platform }) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), `${REPO}-`));
   const stagedPath = path.join(
     outDir,
@@ -215,6 +206,43 @@ async function installBinary({ outDir = __dirname, fetchBuffer = httpGet } = {})
       fs.rmSync(tmpDir, { recursive: true, force: true });
     } catch {}
   }
+}
+
+async function installBinary({
+  outDir = __dirname,
+  fetchBuffer = httpGet,
+  platformRaw,
+  archRaw,
+  version,
+  baseUrl,
+} = {}) {
+  const resolvedVersion = version !== undefined ? version : readPackageVersion();
+  const { platform, exe, assetName, bases } = resolveTarget({
+    platformRaw,
+    archRaw,
+    version: resolvedVersion,
+    baseUrl,
+  });
+
+  const binPath = path.join(outDir, exe);
+  if (fs.existsSync(binPath)) {
+    if (platform !== "windows") {
+      try {
+        if ((fs.statSync(binPath).mode & 0o111) === 0) {
+          fs.chmodSync(binPath, 0o755);
+        }
+      } catch {}
+    }
+    return;
+  }
+
+  const headers = { "User-Agent": `${REPO}-postinstall` };
+  const tarGz = await downloadVerifiedArchive(fetchBuffer, {
+    assetName,
+    bases,
+    headers,
+  });
+  extractArchiveToBin(tarGz, { outDir, assetName, exe, binPath, platform });
   console.error(`postinstall: installed ${exe} to ${outDir}`);
 }
 
@@ -225,4 +253,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { installBinary };
+module.exports = { installBinary, resolveTarget };

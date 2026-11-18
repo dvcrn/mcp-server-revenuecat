@@ -120,13 +120,20 @@ func getChartData(ctx context.Context, env *Env, in getChartDataInput) (*mcp.Cal
 	}
 
 	if len(in.Filters) > 0 {
-		for _, f := range in.Filters {
-			if _, err := requireID("filters.name", f.Name); err != nil {
+		for i, f := range in.Filters {
+			name, err := requireCleanField("filters.name", f.Name)
+			if err != nil {
 				return nil, nil, err
 			}
 			if len(f.Values) == 0 {
-				return nil, nil, fmt.Errorf("filters.values for %q cannot be empty", f.Name)
+				return nil, nil, fmt.Errorf("filters.values for %q cannot be empty", name)
 			}
+			for _, val := range f.Values {
+				if revenuecat.HasControlOrInvalidUTF8(val) {
+					return nil, nil, fmt.Errorf("filters.values for %q contains invalid characters", name)
+				}
+			}
+			in.Filters[i].Name = name
 		}
 		raw, err := json.Marshal(in.Filters)
 		if err != nil {
@@ -138,6 +145,11 @@ func getChartData(ctx context.Context, env *Env, in getChartDataInput) (*mcp.Cal
 	}
 
 	if len(in.Selectors) > 0 {
+		for k, v := range in.Selectors {
+			if revenuecat.HasControlOrInvalidUTF8(k) || revenuecat.HasControlOrInvalidUTF8(v) {
+				return nil, nil, fmt.Errorf("selectors contains invalid characters")
+			}
+		}
 		raw, err := json.Marshal(in.Selectors)
 		if err != nil {
 			return nil, nil, fmt.Errorf("encode selectors: %w", err)

@@ -82,10 +82,13 @@ func registerTools(r registry) {
 	registerProjectTools(r)
 	registerMetricTools(r)
 	registerCustomerTools(r)
+	registerCustomerWriteTools(r)
 	registerSubscriptionTools(r)
 	registerPurchaseTools(r)
-	registerCatalogTools(r)
-	registerWriteTools(r)
+	registerProductTools(r)
+	registerEntitlementTools(r)
+	registerOfferingTools(r)
+	registerPackageTools(r)
 }
 
 // add registers a tool whose handler receives the request's Env. An Out of any

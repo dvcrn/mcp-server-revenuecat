@@ -36,6 +36,11 @@ type listPurchaseEntitlementsInput struct {
 	StartingAfter string `json:"starting_after,omitempty" jsonschema:"Pagination cursor from the previous page's next_page starting_after parameter."`
 }
 
+type refundPurchaseInput struct {
+	Project    string `json:"project" jsonschema:"Configured project alias (see list_projects) or RevenueCat proj... ID."`
+	PurchaseID string `json:"purchase_id" jsonschema:"RevenueCat purchase ID (pur...)."`
+}
+
 func registerPurchaseTools(r registry) {
 	add(r, &mcp.Tool{
 		Name:        "list_customer_purchases",
@@ -60,6 +65,12 @@ func registerPurchaseTools(r registry) {
 		Description: "List entitlements unlocked by `purchase_id`.",
 		Annotations: readOnly(),
 	}, listPurchaseEntitlements)
+
+	add(r, &mcp.Tool{
+		Name:        "refund_purchase",
+		Description: "Refund a RevenueCat Web Billing (`rc_billing`) one-time purchase and revoke entitlement access immediately. Confirm with the user first.",
+		Annotations: destructive(),
+	}, refundPurchase)
 }
 
 func listCustomerPurchases(ctx context.Context, env *Env, in listCustomerPurchasesInput) (*mcp.CallToolResult, any, error) {
@@ -157,5 +168,25 @@ func listPurchaseEntitlements(ctx context.Context, env *Env, in listPurchaseEnti
 		"/v2/projects/{project_id}/purchases/{purchase_id}/entitlements",
 		[]string{"projects", p.ProjectID, "purchases", purID, "entitlements"},
 		q,
+	)
+}
+
+func refundPurchase(ctx context.Context, env *Env, in refundPurchaseInput) (*mcp.CallToolResult, any, error) {
+	p, err := env.resolveProject(in.Project)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	purchaseID, err := requireID("purchase_id", in.PurchaseID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return postJSON(
+		ctx,
+		p,
+		"/v2/projects/{project_id}/purchases/{purchase_id}/actions/refund",
+		[]string{"projects", p.ProjectID, "purchases", purchaseID, "actions", "refund"},
+		nil,
 	)
 }

@@ -100,7 +100,6 @@ func TestClientPostAndDelete(t *testing.T) {
 		t.Context(),
 		"/v2/projects/{project_id}/entitlements",
 		[]string{"projects", "proj1ab2c3d4", "entitlements"},
-		nil,
 		map[string]any{"lookup_key": "pro", "display_name": "Pro"},
 	)
 	if err != nil {
@@ -121,7 +120,6 @@ func TestClientPostAndDelete(t *testing.T) {
 		"/v2/projects/{project_id}/subscriptions/{subscription_id}/actions/cancel",
 		[]string{"projects", "proj1ab2c3d4", "subscriptions", "sub_dummy", "actions", "cancel"},
 		nil,
-		nil,
 	)
 	if err != nil {
 		t.Fatalf("Post without body: %v", err)
@@ -132,7 +130,7 @@ func TestClientPostAndDelete(t *testing.T) {
 
 	// Typed-nil pointer must fail rather than sending literal "null".
 	var typedNil *struct{ Name string }
-	if _, err := c.Post(t.Context(), "/v2/test", []string{"projects"}, nil, typedNil); err == nil {
+	if _, err := c.Post(t.Context(), "/v2/test", []string{"projects"}, typedNil); err == nil {
 		t.Fatal("Post with typed-nil pointer succeeded, want error")
 	}
 
@@ -164,7 +162,7 @@ func TestClientReadOnlyContextBlocksWrites(t *testing.T) {
 	if _, err := c.Get(ctx, "/v2/projects", []string{"projects"}, nil); err != nil {
 		t.Fatalf("Get in read-only context failed: %v", err)
 	}
-	if _, err := c.Post(ctx, "/v2/projects", []string{"projects"}, nil, map[string]any{"a": 1}); !errors.Is(err, ErrReadOnly) {
+	if _, err := c.Post(ctx, "/v2/projects", []string{"projects"}, map[string]any{"a": 1}); !errors.Is(err, ErrReadOnly) {
 		t.Fatalf("Post in read-only context err = %v, want ErrReadOnly", err)
 	}
 	if _, err := c.Delete(ctx, "/v2/projects/proj1ab2c3d4", []string{"projects", "proj1ab2c3d4"}); !errors.Is(err, ErrReadOnly) {
@@ -300,5 +298,16 @@ func TestValidators(t *testing.T) {
 	}
 	if !ValidSecretKey("sk_dummy_projectA") || ValidSecretKey("appl_dummy") || ValidSecretKey("sk_") || ValidSecretKey("sk_bad key") {
 		t.Fatal("unexpected ValidSecretKey result")
+	}
+	if HasControlOrInvalidUTF8("valid-utf8-✓") || !HasControlOrInvalidUTF8("bad\x00") || !HasControlOrInvalidUTF8("bad\x7f") || !HasControlOrInvalidUTF8(string([]byte{0xff})) {
+		t.Fatal("unexpected HasControlOrInvalidUTF8 result")
+	}
+
+	q := NewQuery()
+	if err := q.SetString("search", string([]byte{0xff})); err == nil {
+		t.Fatal("Query.SetString accepted invalid UTF-8")
+	}
+	if err := q.AddStrings("expand", []string{"items\x1f"}); err == nil {
+		t.Fatal("Query.AddStrings accepted control character")
 	}
 }

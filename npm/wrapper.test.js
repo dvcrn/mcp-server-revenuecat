@@ -6,7 +6,8 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { spawn, spawnSync } = require("node:child_process");
 
-const { installBinary } = require("./postinstall");
+const { installBinary, resolveTarget } = require("./postinstall");
+const { parseVersion, isNewerVersion } = require("./update_check");
 
 function sha256Hex(buf) {
   return crypto.createHash("sha256").update(buf).digest("hex");
@@ -21,6 +22,69 @@ function buildArchive(tmpDir, exeName, content) {
   return fs.readFileSync(path.join(tmpDir, archiveName));
 }
 
+test("resolveTarget maps platforms, architectures, and release URLs purely", () => {
+  const linux = resolveTarget({
+    platformRaw: "linux",
+    archRaw: "x64",
+    version: "v0.1.0",
+  });
+  assert.deepEqual(linux, {
+    platform: "linux",
+    arch: "amd64",
+    exe: "mcp-server-revenuecat-org",
+    assetName: "mcp-server-revenuecat-org_0.1.0_linux_amd64.tar.gz",
+    bases: [
+      "https://github.com/dvcrn/mcp-server-revenuecat-org/releases/download/0.1.0",
+      "https://github.com/dvcrn/mcp-server-revenuecat-org/releases/download/v0.1.0",
+    ],
+  });
+
+  const win = resolveTarget({
+    platformRaw: "win32",
+    archRaw: "arm64",
+    version: "1.2.3",
+    baseUrl: "https://example.invalid/releases/",
+  });
+  assert.equal(win.platform, "windows");
+  assert.equal(win.exe, "mcp-server-revenuecat-org.exe");
+  assert.equal(win.assetName, "mcp-server-revenuecat-org_1.2.3_windows_arm64.tar.gz");
+  assert.deepEqual(win.bases, ["https://example.invalid/releases"]);
+
+  assert.throws(
+    () => resolveTarget({ platformRaw: "freebsd", archRaw: "x64", version: "0.1.0" }),
+    /supports macOS/,
+  );
+  assert.throws(
+    () => resolveTarget({ platformRaw: "darwin", archRaw: "arm", version: "0.1.0" }),
+    /Unsupported darwin arch: armv7/,
+  );
+  assert.throws(
+    () => resolveTarget({ platformRaw: "win32", archRaw: "arm", version: "0.1.0" }),
+    /Unsupported windows arch: armv7/,
+  );
+  assert.throws(
+    () => resolveTarget({ platformRaw: "linux", archRaw: "x64", version: "" }),
+    /could not determine version/,
+  );
+});
+
+test("parseVersion and isNewerVersion compare stable MAJOR.MINOR.PATCH tuples", () => {
+  assert.deepEqual(parseVersion("v1.2.3"), {
+    version: "1.2.3",
+    tuple: [1, 2, 3],
+  });
+  assert.equal(parseVersion("01.2.3"), null);
+  assert.equal(parseVersion("1.2.3-beta.1"), null);
+  assert.equal(parseVersion(""), null);
+
+  assert.equal(isNewerVersion("0.2.0", "0.1.9"), true);
+  assert.equal(isNewerVersion("1.0.0", "0.99.99"), true);
+  assert.equal(isNewerVersion("0.1.10", "0.1.2"), true);
+  assert.equal(isNewerVersion("0.1.0", "0.1.0"), false);
+  assert.equal(isNewerVersion("0.1.0", "0.2.0"), false);
+  assert.equal(isNewerVersion("invalid", "0.1.0"), false);
+});
+
 test("installBinary extracts via relative tar args and renames atomically under concurrency", async () => {
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "rc-npm-test-"));
   const fixtureDir = path.join(workDir, "fixture");
@@ -28,33 +92,27 @@ test("installBinary extracts via relative tar args and renames atomically under 
   fs.mkdirSync(fixtureDir);
   fs.mkdirSync(outDir);
 
-  const prevVersion = process.env.MCP_SERVER_REVENUECAT_ORG_VERSION;
-  const prevPlatform = process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM;
-  const prevArch = process.env.MCP_SERVER_REVENUECAT_ORG_ARCH;
-  const prevBase = process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL;
-
   try {
-    process.env.MCP_SERVER_REVENUECAT_ORG_VERSION = "0.1.0";
-    process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM = "linux";
-    process.env.MCP_SERVER_REVENUECAT_ORG_ARCH = "amd64";
-    process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL = "https://example.invalid/releases";
-
     const exe = "mcp-server-revenuecat-org";
     const assetName = `${exe}_0.1.0_linux_amd64.tar.gz`;
     const expectedPayload = "#!/bin/sh\necho ok\n";
     const archiveBuf = buildArchive(fixtureDir, exe, expectedPayload);
     const checksumLine = `${sha256Hex(archiveBuf)}  ${assetName}\n`;
 
-    const fetchBuffer = async (url) => {
-      if (url.endsWith(`/${assetName}`)) return archiveBuf;
-      if (url.endsWith("/checksums.txt")) return Buffer.from(checksumLine, "utf8");
-      throw new Error(`unexpected URL ${url}`);
+    const opts = {
+      outDir,
+      version: "0.1.0",
+      platformRaw: "linux",
+      archRaw: "x64",
+      baseUrl: "https://example.invalid/releases",
+      fetchBuffer: async (url) => {
+        if (url.endsWith(`/${assetName}`)) return archiveBuf;
+        if (url.endsWith("/checksums.txt")) return Buffer.from(checksumLine, "utf8");
+        throw new Error(`unexpected URL ${url}`);
+      },
     };
 
-    await Promise.all([
-      installBinary({ outDir, fetchBuffer }),
-      installBinary({ outDir, fetchBuffer }),
-    ]);
+    await Promise.all([installBinary(opts), installBinary(opts)]);
 
     const binPath = path.join(outDir, exe);
     assert.equal(fs.readFileSync(binPath, "utf8"), expectedPayload);
@@ -63,14 +121,6 @@ test("installBinary extracts via relative tar args and renames atomically under 
     const remaining = fs.readdirSync(outDir);
     assert.deepEqual(remaining, [exe]);
   } finally {
-    if (prevVersion === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_VERSION;
-    else process.env.MCP_SERVER_REVENUECAT_ORG_VERSION = prevVersion;
-    if (prevPlatform === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM;
-    else process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM = prevPlatform;
-    if (prevArch === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_ARCH;
-    else process.env.MCP_SERVER_REVENUECAT_ORG_ARCH = prevArch;
-    if (prevBase === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL;
-    else process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL = prevBase;
     fs.rmSync(workDir, { recursive: true, force: true });
   }
 });
@@ -82,26 +132,23 @@ test("installBinary rejects mismatched or missing checksums without writing binP
   fs.mkdirSync(fixtureDir);
   fs.mkdirSync(outDir);
 
-  const prevVersion = process.env.MCP_SERVER_REVENUECAT_ORG_VERSION;
-  const prevPlatform = process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM;
-  const prevArch = process.env.MCP_SERVER_REVENUECAT_ORG_ARCH;
-  const prevBase = process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL;
-
   try {
-    process.env.MCP_SERVER_REVENUECAT_ORG_VERSION = "0.1.0";
-    process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM = "linux";
-    process.env.MCP_SERVER_REVENUECAT_ORG_ARCH = "amd64";
-    process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL = "https://example.invalid/releases";
-
     const exe = "mcp-server-revenuecat-org";
     const assetName = `${exe}_0.1.0_linux_amd64.tar.gz`;
     const archiveBuf = buildArchive(fixtureDir, exe, "#!/bin/sh\necho tampered\n");
     const wrongSum = "0".repeat(64);
+    const baseOpts = {
+      outDir,
+      version: "0.1.0",
+      platformRaw: "linux",
+      archRaw: "x64",
+      baseUrl: "https://example.invalid/releases",
+    };
 
     await assert.rejects(
       () =>
         installBinary({
-          outDir,
+          ...baseOpts,
           fetchBuffer: async (url) => {
             if (url.endsWith(`/${assetName}`)) return archiveBuf;
             if (url.endsWith("/checksums.txt")) {
@@ -117,7 +164,7 @@ test("installBinary rejects mismatched or missing checksums without writing binP
     await assert.rejects(
       () =>
         installBinary({
-          outDir,
+          ...baseOpts,
           fetchBuffer: async (url) => {
             if (url.endsWith(`/${assetName}`)) return archiveBuf;
             if (url.endsWith("/checksums.txt")) {
@@ -130,14 +177,6 @@ test("installBinary rejects mismatched or missing checksums without writing binP
     );
     assert.deepEqual(fs.readdirSync(outDir), []);
   } finally {
-    if (prevVersion === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_VERSION;
-    else process.env.MCP_SERVER_REVENUECAT_ORG_VERSION = prevVersion;
-    if (prevPlatform === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM;
-    else process.env.MCP_SERVER_REVENUECAT_ORG_PLATFORM = prevPlatform;
-    if (prevArch === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_ARCH;
-    else process.env.MCP_SERVER_REVENUECAT_ORG_ARCH = prevArch;
-    if (prevBase === undefined) delete process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL;
-    else process.env.MCP_SERVER_REVENUECAT_ORG_BASE_URL = prevBase;
     fs.rmSync(workDir, { recursive: true, force: true });
   }
 });

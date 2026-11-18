@@ -166,7 +166,7 @@ func TestAllReadToolsRoutingAndQueryEncoding(t *testing.T) {
 				"resolution":         "day",
 				"currency":           "EUR",
 				"segment":            "country",
-				"filters":            []map[string]any{{"name": "country", "values": []string{"US", "DE"}}},
+				"filters":            []map[string]any{{"name": " country ", "values": []string{"US", "DE"}}},
 				"selectors":          map[string]string{"revenue_type": "proceeds"},
 				"aggregate":          []string{"average", "total"},
 				"realtime":           false,

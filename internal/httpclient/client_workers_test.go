@@ -12,10 +12,17 @@ import (
 
 func TestWorkersClientHandles204NullBodyAndRefusesRedirect(t *testing.T) {
 	origFetch := js.Global().Get("fetch")
-	t.Cleanup(func() { js.Global().Set("fetch", origFetch) })
 
-	var nextStatus int
-	mockFetch := js.FuncOf(func(_ js.Value, _ []js.Value) any {
+	var (
+		nextStatus  int
+		lastSignal  js.Value
+		gotSignalOK bool
+	)
+	mockFetch := js.FuncOf(func(_ js.Value, args []js.Value) any {
+		if len(args) >= 2 {
+			lastSignal = args[1].Get("signal")
+			gotSignalOK = !lastSignal.IsUndefined() && !lastSignal.IsNull()
+		}
 		init := js.Global().Get("Object").New()
 		init.Set("status", nextStatus)
 		if nextStatus == http.StatusFound {
@@ -26,8 +33,11 @@ func TestWorkersClientHandles204NullBodyAndRefusesRedirect(t *testing.T) {
 		resp := js.Global().Get("Response").New(js.Null(), init)
 		return js.Global().Get("Promise").Call("resolve", resp)
 	})
-	defer mockFetch.Release()
 	js.Global().Set("fetch", mockFetch)
+	t.Cleanup(func() {
+		js.Global().Set("fetch", origFetch)
+		mockFetch.Release()
+	})
 
 	client := New()
 
@@ -41,6 +51,9 @@ func TestWorkersClientHandles204NullBodyAndRefusesRedirect(t *testing.T) {
 		t.Fatalf("204 Do error: %v", err)
 	}
 	defer resp.Body.Close()
+	if !gotSignalOK {
+		t.Fatal("fetch options missing AbortSignal")
+	}
 	data, err := io.ReadAll(resp.Body)
 	if err != nil || len(data) != 0 {
 		t.Fatalf("204 ReadAll = (%q, %v), want empty", data, err)
@@ -53,5 +66,8 @@ func TestWorkersClientHandles204NullBodyAndRefusesRedirect(t *testing.T) {
 	}
 	if _, err := client.Do(req302); !errors.Is(err, ErrRedirect) {
 		t.Fatalf("302 Do err = %v, want ErrRedirect", err)
+	}
+	if !lastSignal.Get("aborted").Bool() {
+		t.Fatal("expected AbortSignal to be aborted after 302 redirect")
 	}
 }
