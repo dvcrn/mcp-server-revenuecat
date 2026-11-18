@@ -2,7 +2,6 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const https = require("https");
-const semver = require("semver");
 
 const DEFAULT_PACKAGE_NAME = "mcp-server-revenuecat-org";
 const DEFAULT_UPDATE_COMMAND = "npm install -g mcp-server-revenuecat-org";
@@ -103,7 +102,7 @@ function fetchLatestVersion(packageName, timeoutMs, signal) {
   });
 }
 
-function normalizeVersion(version) {
+function normalizeVersion(semver, version) {
   if (!version) return "";
   const cleaned = semver.clean(version);
   if (cleaned) return cleaned;
@@ -131,7 +130,14 @@ async function runUpdateCheck({
   if (isDisabled()) return;
   if (!process.stderr.isTTY) return;
 
-  const installed = normalizeVersion(installedVersion);
+  let semver;
+  try {
+    semver = require("semver");
+  } catch {
+    return;
+  }
+
+  const installed = normalizeVersion(semver, installedVersion);
   if (!installed) return;
 
   const cache = readCache() || {};
@@ -144,7 +150,7 @@ async function runUpdateCheck({
   const now = Date.now();
 
   if (lastChecked && now - lastChecked < UPDATE_CHECK_INTERVAL_MS) {
-    const latestCached = normalizeVersion(cachedLatest);
+    const latestCached = normalizeVersion(semver, cachedLatest);
     if (latestCached && semver.gt(latestCached, installed)) {
       if (!lastNotified || now - lastNotified >= UPDATE_CHECK_INTERVAL_MS) {
         printNotice({
@@ -164,7 +170,7 @@ async function runUpdateCheck({
     UPDATE_CHECK_TIMEOUT_MS,
     signal,
   );
-  const latest = normalizeVersion(latestRaw);
+  const latest = normalizeVersion(semver, latestRaw);
 
   writeCache({ lastChecked: now, lastNotified, latest: latest || latestRaw });
 

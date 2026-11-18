@@ -4,8 +4,8 @@ wrangler = "4.156.1"
 jq = "1.8.1"
 goreleaser = "2.19.0"
 
-# CLOUDFLARE_ACCOUNT_ID comes from fnox.cloud.toml (cloud profile) in cloud sessions
-# and from the gitignored mise.local.toml on local machines.
+# Set CLOUDFLARE_ACCOUNT_ID in the gitignored mise.local.toml (or shell environment)
+# when deploying with CLOUDFLARE_API_TOKEN instead of `wrangler login`.
 
 [tasks.build-worker]
 description = "Build the Cloudflare Workers bundle into build/"
@@ -74,8 +74,8 @@ printf %s "$projects" | wrangler secret put REVENUECAT_PROJECTS
 '''
 
 [tasks.test]
-description = "Run Go tests with the race detector"
-run = "go test -race ./..."
+description = "Run Go tests with the race detector and npm wrapper tests"
+run = ["go test -race ./...", "node --test npm/wrapper.test.js"]
 
 [tasks.lint]
 description = "Vet the native and wasm builds"

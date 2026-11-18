@@ -82,7 +82,7 @@ function parseChecksums(text) {
   return map;
 }
 
-async function installBinary() {
+async function installBinary({ outDir = __dirname, fetchBuffer = httpGet } = {}) {
   const platformRaw = process.env[PLATFORM_ENV] || process.platform;
   const platform = platformRaw === "win32" ? "windows" : platformRaw;
   if (!["darwin", "linux", "windows"].includes(platform)) {
@@ -125,14 +125,17 @@ async function installBinary() {
       ];
 
   const headers = { "User-Agent": `${REPO}-postinstall` };
-  const outDir = __dirname;
   const exe = platform === "windows" ? `${BIN}.exe` : BIN;
   const binPath = path.join(outDir, exe);
 
   if (fs.existsSync(binPath)) {
-    try {
-      fs.chmodSync(binPath, 0o755);
-    } catch {}
+    if (platform !== "windows") {
+      try {
+        if ((fs.statSync(binPath).mode & 0o111) === 0) {
+          fs.chmodSync(binPath, 0o755);
+        }
+      } catch {}
+    }
     return;
   }
 
@@ -143,7 +146,7 @@ async function installBinary() {
     const url = `${base}/${assetName}`;
     console.error(`postinstall: downloading ${assetName} from ${url}`);
     try {
-      tarGz = await httpGet(url, { headers });
+      tarGz = await fetchBuffer(url, { headers });
       baseUsed = base;
       break;
     } catch (e) {
@@ -153,7 +156,7 @@ async function installBinary() {
   if (!tarGz) throw lastErr || new Error("failed to download binary");
 
   const checksumsUrl = `${baseUsed}/checksums.txt`;
-  const checksumsBuf = await httpGet(checksumsUrl, { headers });
+  const checksumsBuf = await fetchBuffer(checksumsUrl, { headers });
   const checksums = parseChecksums(checksumsBuf.toString("utf8"));
   const sumExpected = checksums.get(assetName);
   if (!sumExpected) {
@@ -166,20 +169,36 @@ async function installBinary() {
   console.error("postinstall: checksum OK");
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), `${REPO}-`));
-  const tmpFile = path.join(tmpDir, assetName);
+  const stagedPath = path.join(
+    outDir,
+    `.${exe}.${process.pid}.${crypto.randomBytes(4).toString("hex")}.tmp`,
+  );
   try {
-    fs.writeFileSync(tmpFile, tarGz);
-    // stdout stays untouched: it carries the protocol when index.js installs on first run of a stdio server.
-    const tarRes = spawnSync("tar", ["-xzf", tmpFile, "-C", outDir, exe], {
+    fs.writeFileSync(path.join(tmpDir, assetName), tarGz);
+    // Relative arguments from tmpDir keep GNU tar on Windows from reading C: as a remote host,
+    // and stdio keeps stdout untouched when index.js installs on first run of a stdio server.
+    const tarRes = spawnSync("tar", ["-xzf", assetName, exe], {
+      cwd: tmpDir,
       stdio: ["ignore", 2, 2],
     });
-    if (tarRes.status !== 0) {
+    if (tarRes.error || tarRes.status !== 0) {
       throw new Error("postinstall: failed to extract binary");
     }
+    fs.copyFileSync(path.join(tmpDir, exe), stagedPath);
+    if (platform !== "windows") {
+      fs.chmodSync(stagedPath, 0o755);
+    }
     try {
-      fs.chmodSync(binPath, 0o755);
-    } catch {}
+      fs.renameSync(stagedPath, binPath);
+    } catch (err) {
+      if (!(platform === "windows" && fs.existsSync(binPath))) {
+        throw err;
+      }
+    }
   } finally {
+    try {
+      fs.rmSync(stagedPath, { force: true });
+    } catch {}
     try {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     } catch {}

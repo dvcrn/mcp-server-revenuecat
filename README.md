@@ -2,9 +2,9 @@
 
 Multi-project MCP server for RevenueCat REST API v2, written in Go.
 
-This server addresses two limitations of RevenueCat's hosted MCP (`https://mcp.revenuecat.ai/mcp`):
+This server addresses two limitations of connecting agents directly to RevenueCat's hosted MCP (`https://mcp.revenuecat.ai/mcp`):
 
-- OAuth sessions on the hosted MCP expire, breaking unattended and background agents.
+- Interactive OAuth sessions on the hosted MCP expire, breaking unattended and background agents.
 - Each RevenueCat API v2 secret key (`sk_...`) is scoped to a single project, so multi-project setups otherwise need a separate MCP server per app or project.
 
 `mcp-server-revenuecat-org` serves all configured RevenueCat projects behind one MCP endpoint (stdio, HTTP, Docker, or Cloudflare Workers), routing each tool call to the right project's `sk_` secret key and supporting strict read-only mode via `MCP_READ_ONLY` or `MCP_READ_TOKEN`.
@@ -18,7 +18,7 @@ The server reads its configuration from environment variables:
 | `REVENUECAT_PROJECTS` | always | JSON array of projects and their RevenueCat API v2 `sk_` secret keys (see dummy example below) |
 | `MCP_TOKEN` | HTTP, unless `MCP_READ_TOKEN` is set | Bearer token for every tool (unless `MCP_READ_ONLY` is true), sent as `Authorization: Bearer <token>` or `X-API-Key`. Generate one with `openssl rand -hex 32` |
 | `MCP_READ_TOKEN` | HTTP, optional | Bearer token for read-only tools only. Must differ from `MCP_TOKEN` |
-| `MCP_READ_ONLY` | optional | `1` or `true` restricts stdio and `MCP_TOKEN` to read-only tools. Non-boolean values fail startup |
+| `MCP_READ_ONLY` | optional | `1` or `true` restricts stdio and `MCP_TOKEN` to read-only tools. Non-boolean values fail stdio startup and make every HTTP request return 500 |
 
 `REVENUECAT_PROJECTS` lists each RevenueCat project with a lowercase alias, display name, `proj...` project ID, and project-scoped v2 secret key (`sk_...`). Dummy example data:
 
@@ -37,7 +37,7 @@ Read-only mode can be enforced at three independent layers:
 
 1. Environment flag: setting `MCP_READ_ONLY=1` (or `true`) causes both stdio and HTTP (`MCP_TOKEN`) to register only the 29 read-only tools. Write tools are omitted from `tools/list`, and calling any write tool name fails as an unknown tool.
 2. Separate HTTP read token: over HTTP, clients authenticating with `MCP_READ_TOKEN` always receive the read-only server, even when `MCP_TOKEN` has full read-write access. If only `MCP_READ_TOKEN` is configured, the entire HTTP server is read-only.
-3. Outbound HTTP guard and RevenueCat key scopes: read-only tool requests block `POST` and `DELETE` calls in the HTTP client before a request is built. For read-only deployments, also issue RevenueCat API v2 keys with read-only project permissions in the RevenueCat dashboard.
+3. Client guard and RevenueCat key scopes: read-only tools refuse `POST` and `DELETE` in the RevenueCat client before a request is built. For read-only deployments, also issue RevenueCat API v2 keys with read-only project permissions in the RevenueCat dashboard.
 
 ## Install
 
@@ -62,7 +62,7 @@ Install with one of:
 
 ```sh
 npm install -g mcp-server-revenuecat-org
-mise use -g go:github.com/dvcrn/mcp-server-revenuecat-org/cmd/mcp@main
+mise use -g go:github.com/dvcrn/mcp-server-revenuecat-org/cmd/mcp@latest
 go install github.com/dvcrn/mcp-server-revenuecat-org/cmd/mcp@latest
 ```
 
@@ -222,7 +222,7 @@ Available only when `MCP_READ_ONLY` is unset/`false` and (over HTTP) when authen
 
 ## Direct REST API v2 vs. hosted MCP
 
-RevenueCat's hosted MCP (`https://mcp.revenuecat.ai/mcp`) accepts an `sk_...` secret key as a bearer token, so `mcp-server-revenuecat-org` calls `https://api.revenuecat.com/v2` directly instead of proxying the hosted MCP:
+RevenueCat's hosted MCP (`https://mcp.revenuecat.ai/mcp`) accepts an `sk_...` secret key as a bearer token, but `mcp-server-revenuecat-org` calls `https://api.revenuecat.com/v2` directly instead of proxying it because:
 
 - Read-only mode executes pure `GET` requests against versioned v2 paths rather than filtering an unversioned upstream tool list where some `readOnlyHint` tools perform `POST` actions.
 - Every project-scoped tool accepts configured project aliases or allowlisted `proj...` IDs consistently, whereas hosted MCP tools omit project selectors on single-key endpoints or require raw `proj...` IDs.

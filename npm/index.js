@@ -32,7 +32,9 @@ async function main() {
 
   if (process.platform !== "win32") {
     try {
-      fs.chmodSync(binPath, 0o755);
+      if ((fs.statSync(binPath).mode & 0o111) === 0) {
+        fs.chmodSync(binPath, 0o755);
+      }
     } catch {}
   }
 
@@ -41,6 +43,19 @@ async function main() {
     windowsHide: true,
   });
 
+  const signalListeners = new Map();
+  for (const sig of ["SIGINT", "SIGTERM"]) {
+    const listener = () => {
+      if (child.exitCode === null && child.signalCode === null) {
+        try {
+          child.kill(sig);
+        } catch {}
+      }
+    };
+    signalListeners.set(sig, listener);
+    process.on(sig, listener);
+  }
+
   // Abort on child exit so an in-flight check cannot hold the event loop open.
   const updateAbort = new AbortController();
   startUpdateCheck({
@@ -48,13 +63,24 @@ async function main() {
     signal: updateAbort.signal,
   });
 
-  child.on("exit", (code) => {
+  child.on("exit", (code, signal) => {
+    for (const [sig, listener] of signalListeners) {
+      process.off(sig, listener);
+    }
     try {
       updateAbort.abort();
     } catch {}
+    if (signal) {
+      process.exitCode =
+        signal === "SIGINT" ? 130 : signal === "SIGTERM" ? 143 : 1;
+      return;
+    }
     process.exitCode = code == null ? 1 : code;
   });
   child.on("error", (err) => {
+    for (const [sig, listener] of signalListeners) {
+      process.off(sig, listener);
+    }
     console.error(err.message);
     process.exitCode = 1;
   });
